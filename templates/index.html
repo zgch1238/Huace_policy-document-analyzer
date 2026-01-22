@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>华测导航 - 政策文档分析助手</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 左侧菜单栏 -->
+        <aside class="sidebar">
+            <!-- Logo 区域 -->
+            <div class="logo-area">
+                <div class="logo">
+                    <svg viewBox="0 0 32 32" fill="none">
+                        <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2"/>
+                        <path d="M16 8 L16 16 L22 22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="16" cy="16" r="3" fill="currentColor"/>
+                    </svg>
+                </div>
+                <span class="logo-text">政策文档分析助手</span>
+            </div>
+
+            <!-- 新建对话按钮 -->
+            <button class="new-chat-btn" id="newChatBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>新建对话</span>
+            </button>
+
+            <!-- 菜单列表 -->
+            <nav class="menu-list">
+                <!-- 历史记录分组 -->
+                <div class="menu-group">
+                    <div class="menu-group-title">历史记录</div>
+                    <ul class="menu-items" id="historyList">
+                        <li class="menu-item active" data-view="chat">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                            </svg>
+                            <span>当前对话</span>
+                        </li>
+                        <!-- 历史对话将通过 JS 动态添加 -->
+                    </ul>
+                </div>
+
+                <!-- 文档管理分组 -->
+                <div class="menu-group">
+                    <div class="menu-group-title">文档管理</div>
+                    <ul class="menu-items">
+                        <li class="menu-item" data-view="documents">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="16" y1="13" x2="8" y2="13"/>
+                                <line x1="16" y1="17" x2="8" y2="17"/>
+                            </svg>
+                            <span>政策文档</span>
+                        </li>
+                        <li class="menu-item" data-view="analysis">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+                            </svg>
+                            <span>分析结果</span>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- 底部用户信息 -->
+            <div class="user-area">
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-dot"></span>
+                    <span class="status-text">连接中...</span>
+                </div>
+                <div class="analyze-status" id="analyzeStatus">
+                    <span class="analyze-text">分析状态加载中...</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 右侧主内容区 -->
+        <main class="main-content">
+            <!-- 聊天视图 -->
+            <div class="view-panel active" id="chatView">
+                <div class="chat-area">
+                    <!-- 欢迎区域 -->
+                    <div class="welcome-area" id="welcomeArea">
+                        <div class="welcome-icon">
+                            <svg viewBox="0 0 64 64" fill="none">
+                                <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="2"/>
+                                <path d="M32 20 L32 36 L42 46" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <circle cx="32" cy="32" r="4" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <h1>华测导航政策分析助手</h1>
+                        <p class="welcome-subtitle">智能分析政策文档，提取关键信息</p>
+
+                        <!-- 快捷指令 -->
+                        <div class="quick-commands">
+                            <h3>快捷指令</h3>
+                            <div class="command-grid">
+                                <button class="command-btn" data-command="分析政策文档">
+                                    <span class="command-icon">📊</span>
+                                    <span>分析政策文档</span>
+                                </button>
+                                <button class="command-btn" data-command="提取相关段落">
+                                    <span class="command-icon">📝</span>
+                                    <span>提取相关段落</span>
+                                </button>
+                                <button class="command-btn" data-command="生成引用格式">
+                                    <span class="command-icon">📋</span>
+                                    <span>生成引用格式</span>
+                                </button>
+                                <button class="command-btn" data-command="查看分析结果">
+                                    <span class="command-icon">📑</span>
+                                    <span>查看分析结果</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 消息列表 -->
+                    <div class="messages-container" id="messagesContainer">
+                        <!-- 消息将通过 JS 动态添加 -->
+                    </div>
+
+                    <!-- 输入区域 -->
+                    <div class="input-area">
+                        <div class="input-wrapper">
+                            <textarea id="messageInput" class="message-input" placeholder="输入消息，按 Enter 发送，Shift+Enter 换行..." rows="1"></textarea>
+                            <div class="action-buttons">
+                                <button id="stopButton" class="stop-btn" title="停止生成">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="6" y="6" width="12" height="12" rx="2"/>
+                                    </svg>
+                                </button>
+                                <button id="sendButton" class="send-btn" title="发送">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="22" y1="2" x2="11" y2="13"/>
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="input-hint">按 Enter 发送，Shift+Enter 换行</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 文档管理视图 -->
+            <div class="view-panel" id="documentsView">
+                <div class="view-header">
+                    <h2>政策文档管理</h2>
+                    <div class="view-actions">
+                        <button class="refresh-btn" id="refreshDocs">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6M1 20v-6h6"/>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                            刷新
+                        </button>
+                        <button class="download-btn" id="downloadDocs" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            下载 (<span id="selectedDocCount">0</span>)
+                        </button>
+                        <button class="delete-btn" id="deleteDocs" disabled title="删除选中文件">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="list-scroll-container">
+                    <div class="doc-grid" id="docGrid">
+                        <!-- 文档列表将通过 JS 动态添加 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 分析结果视图 -->
+            <div class="view-panel" id="analysisView">
+                <div class="view-header">
+                    <h2>分析结果</h2>
+                    <div class="view-actions">
+                        <button class="refresh-btn" id="refreshAnalysis">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6M1 20v-6h6"/>
+                                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                            刷新
+                        </button>
+                        <button class="download-btn" id="downloadAnalysis" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            下载 (<span id="selectedAnalysisCount">0</span>)
+                        </button>
+                        <button class="delete-btn" id="deleteAnalysis" disabled title="删除选中文件">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="list-scroll-container">
+                    <div class="analysis-list" id="analysisList">
+                        <!-- 分析结果将通过 JS 动态添加 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 批量分析视图 -->
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
