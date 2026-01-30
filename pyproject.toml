@@ -1,0 +1,30 @@
+[project]
+name = "ai-policy-analyzer"
+version = "0.1.0"
+description = "AI 政策文档分析系统"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.0.0",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "Flask-CORS>=4.0.0",
+    "Flask-Limiter>=3.5.0",
+]
+
+[project.optional-dependencies]
+prod = [
+    "gunicorn>=21.2.0",
+    "waitress>=3.0.0",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

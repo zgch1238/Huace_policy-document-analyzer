@@ -73,6 +73,17 @@ class OpenCodeClient:
 
                 try:
                     resp_data = resp.json()
+
+                    # 检查是否有错误信息
+                    error_info = resp_data.get("info", {}).get("error", {})
+                    if error_info:
+                        error_name = error_info.get("name", "UnknownError")
+                        error_msg = error_info.get("message", str(error_info))
+                        logger.error(f"OpenCode API 错误: {error_name} - {error_msg}")
+                        result["response"] = f"分析失败: {error_name}"
+                        result["completed"] = True
+                        return
+
                     response_parts = resp_data.get("parts", [])
                     full_response = "".join([
                         part.get("text", "")
@@ -139,10 +150,6 @@ class OpenCodeClient:
                 )
             except Exception as e:
                 logger.error(f"异步发送消息失败: {e}")
-
-        import threading
-        thread = threading.Thread(target=do_request, daemon=True)
-        thread.start()
 
     def get_existing_session(self) -> Optional[str]:
         """获取现有会话"""

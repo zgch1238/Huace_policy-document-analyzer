@@ -1,0 +1,19 @@
+[
+  {
+    "username": "zgt",
+    "password": "472429466ad423b24ce77bb99bc9390835759d14a9bb323986520281c152e8f4",
+    "created_at": "",
+    "sessions": [
+      "c0769804-c77e-402a-9d7d-61131a79632a"
+    ]
+  },
+  {
+    "username": "admin",
+    "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+    "role": "admin",
+    "created_at": "",
+    "sessions": [
+      "31aa3350-baf8-4696-b814-1dd5278190af"
+    ]
+  }
+]
