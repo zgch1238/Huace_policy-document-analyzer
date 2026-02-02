@@ -37,18 +37,18 @@ class AnalysisScheduler:
 
         # 如果需要启动时执行且阻塞等待
         if run_at_startup and block:
-            logger.info("执行启动时政策文档分析（同步）...")
-            self.analyzer.run_analysis(policy_dir)
+            logger.info("执行启动时政策文档分析（并行模式）...")
+            self.analyzer.run_parallel_analysis(policy_dir, max_workers=5)
             logger.info("启动时分析完成")
 
         self.scheduler = BackgroundScheduler()
 
-        # 添加定时任务（30天一次）
+        # 添加定时任务（30天一次，使用并行分析）
         self.scheduler.add_job(
-            func=lambda: self.analyzer.run_analysis(policy_dir),
+            func=lambda: self.analyzer.run_parallel_analysis(policy_dir, max_workers=5),
             trigger=IntervalTrigger(days=interval_days),
             id='scheduled_analyze',
-            name='定时政策文档分析',
+            name='定时政策文档分析（并行）',
             replace_existing=True
         )
 

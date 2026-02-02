@@ -7,6 +7,8 @@ const currentUser = inject('currentUser')
 const documents = ref([])
 const loading = ref(false)
 const selectedDocs = ref(new Set())
+const searchKeyword = ref('')
+const searchTimer = ref(null)
 
 const emit = defineEmits(['view-document'])
 
@@ -15,10 +17,10 @@ const isAdmin = computed(() => {
   return currentUser.value && currentUser.value.role === 'admin'
 })
 
-const loadDocuments = async () => {
+const loadDocuments = async (keyword = '') => {
   loading.value = true
   try {
-    const data = await api.getDocuments()
+    const data = await api.getDocuments(keyword)
     if (data.documents && data.documents.length > 0) {
       documents.value = data.documents
     } else {
@@ -30,6 +32,24 @@ const loadDocuments = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleRefresh = async () => {
+  await loadDocuments(searchKeyword.value)
+}
+
+const handleSearch = () => {
+  if (searchTimer.value) {
+    clearTimeout(searchTimer.value)
+  }
+  searchTimer.value = setTimeout(() => {
+    loadDocuments(searchKeyword.value)
+  }, 300)
+}
+
+const clearSearch = () => {
+  searchKeyword.value = ''
+  loadDocuments('')
 }
 
 const toggleDoc = (path) => {
@@ -73,7 +93,6 @@ const handleDownload = async () => {
     } catch (error) {
       console.error(`下载失败: ${filePath}`, error)
     }
-    // 避免浏览器阻止多个下载
     await new Promise(resolve => setTimeout(resolve, 300))
   }
 }
@@ -118,15 +137,31 @@ const handleDocClick = (folder, file) => {
   emit('view-document', docName)
 }
 
-onMounted(loadDocuments)
+onMounted(() => {
+  loadDocuments()
+})
 </script>
 
 <template>
   <div class="documents-view">
     <div class="view-header">
-      <h2>政策文档管理</h2>
+      <div class="header-left">
+        <h2>政策文档管理</h2>
+      </div>
       <div class="view-actions">
-        <button class="refresh-btn" @click="loadDocuments" :disabled="loading">
+        <!-- 搜索框 -->
+        <div class="search-box">
+          <input
+            v-model="searchKeyword"
+            @input="handleSearch"
+            @keyup.esc="clearSearch"
+            type="text"
+            placeholder="搜索文档..."
+            class="search-input"
+          />
+          <button v-if="searchKeyword" @click="clearSearch" class="search-clear">x</button>
+        </div>
+        <button class="refresh-btn" @click="handleRefresh" :disabled="loading">
           {{ loading ? '加载中...' : '刷新' }}
         </button>
         <button
@@ -149,11 +184,16 @@ onMounted(loadDocuments)
 
     <div class="view-content">
       <div v-if="loading" class="loading-state">
-        加载中...
+        <div class="loading-spinner"></div>
+        <span>加载中...</span>
       </div>
 
       <div v-else-if="documents.length === 0" class="empty-state">
-        暂无政策文档
+        <div class="empty-icon">📂</div>
+        <span>{{ searchKeyword ? '没有找到匹配的文档' : '暂无政策文档' }}</span>
+        <button v-if="searchKeyword" @click="clearSearch" class="clear-search-btn">
+          清除搜索
+        </button>
       </div>
 
       <div v-else class="doc-list">
@@ -168,6 +208,9 @@ onMounted(loadDocuments)
             />
           </label>
           <span class="col-name">文件名</span>
+          <span class="col-actions" v-if="selectedDocs.size > 0">
+            已选择 {{ selectedDocs.size }} 个文件
+          </span>
         </div>
 
         <!-- 按文件夹分组 -->
@@ -195,9 +238,12 @@ onMounted(loadDocuments)
               </label>
               <span class="file-icon">📄</span>
               <span class="file-name">{{ file }}</span>
+              <span class="file-actions">
+                <button @click.stop="handleDocClick(folder, file)" class="view-btn">查看</button>
+              </span>
             </div>
-        </div>
           </div>
+        </div>
       </div>
     </div>
   </div>
@@ -212,7 +258,7 @@ onMounted(loadDocuments)
 }
 
 .view-header {
-  padding: 20px 32px;
+  padding: 16px 32px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -220,14 +266,65 @@ onMounted(loadDocuments)
   background: var(--surface);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .view-header h2 {
   font-size: 1.25rem;
   font-weight: 600;
 }
 
+.doc-count {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
 .view-actions {
   display: flex;
+  align-items: center;
   gap: 12px;
+}
+
+/* 搜索框 */
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 8px 32px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  font-size: 0.875rem;
+  width: 200px;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  width: 260px;
+}
+
+.search-clear {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.search-clear:hover {
+  background: var(--border);
 }
 
 .refresh-btn, .download-btn, .delete-btn {
@@ -264,10 +361,52 @@ onMounted(loadDocuments)
   padding: 20px 32px;
 }
 
-.loading-state, .empty-state {
-  text-align: center;
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   color: var(--text-muted);
   padding: 60px 20px;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  padding: 60px 20px;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.clear-search-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  font-size: 0.875rem;
 }
 
 .list-header {
@@ -283,6 +422,12 @@ onMounted(loadDocuments)
 .col-name {
   font-weight: 500;
   color: var(--text-secondary);
+}
+
+.col-actions {
+  margin-left: auto;
+  font-size: 0.875rem;
+  color: var(--accent);
 }
 
 .checkbox-wrapper {
@@ -357,5 +502,26 @@ onMounted(loadDocuments)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.view-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.view-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 </style>

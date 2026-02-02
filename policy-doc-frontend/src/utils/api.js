@@ -31,8 +31,23 @@ export const api = {
   },
 
   // 文档管理
-  async getDocuments() {
-    const res = await fetch(`${API_BASE}/api/documents`)
+  async getDocuments(keyword = '') {
+    const url = keyword
+      ? `${API_BASE}/api/documents?keyword=${encodeURIComponent(keyword)}`
+      : `${API_BASE}/api/documents`
+    const res = await fetch(url)
+    return res.json()
+  },
+
+  async syncData() {
+    const res = await fetch(`${API_BASE}/api/sync-data`, {
+      method: 'POST'
+    })
+    return res.json()
+  },
+
+  async getStatistics() {
+    const res = await fetch(`${API_BASE}/api/statistics`)
     return res.json()
   },
 
@@ -60,6 +75,15 @@ export const api = {
     return res.json()
   },
 
+  async searchAnalysis(keyword = '', minScore = null, startDate = null, endDate = null) {
+    let url = `${API_BASE}/api/analysis/search?keyword=${encodeURIComponent(keyword)}`
+    if (minScore !== null) url += `&minScore=${minScore}`
+    if (startDate) url += `&startDate=${startDate}`
+    if (endDate) url += `&endDate=${endDate}`
+    const res = await fetch(url)
+    return res.json()
+  },
+
   async downloadAnalysis(files) {
     const res = await fetch(`${API_BASE}/api/download-analysis`, {
       method: 'POST',
@@ -81,6 +105,11 @@ export const api = {
   // 分析状态
   async getAnalyzeStatus() {
     const res = await fetch(`${API_BASE}/api/analyze-status`)
+    return res.json()
+  },
+
+  async getAnalyzeProgress() {
+    const res = await fetch(`${API_BASE}/api/analyze-progress`)
     return res.json()
   },
 

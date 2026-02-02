@@ -26,6 +26,9 @@ from scheduler import AnalysisScheduler, APSCHEDULER_AVAILABLE
 from backend.auth import register, login, add_session, get_user_sessions, remove_session, is_admin
 from backend.services.file_service import FileService
 from backend.services.session_service import SessionService
+from backend.database import (
+    init_db, migrate_existing_files
+)
 
 OPENCODE_SERVER_URL = os.getenv('OPENCODE_SERVER_URL', 'http://127.0.0.1:4096')
 FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
@@ -50,6 +53,13 @@ limiter = Limiter(
 opencode_client = OpenCodeClient(OPENCODE_SERVER_URL)
 analyzer = PolicyAnalyzer(opencode_client)
 scheduler = AnalysisScheduler(analyzer)
+
+# 初始化数据库
+try:
+    init_db()
+    logger.info("数据库初始化成功")
+except Exception as e:
+    logger.error(f"数据库初始化失败: {e}")
 
 SESSION_ID = None
 
@@ -138,14 +148,29 @@ def ask():
 
 @app.route("/api/documents")
 def list_documents():
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    policy_dir = os.path.join(project_root, 'policy_document')
+    """直接从 policy_document 目录获取文档列表"""
+    keyword = request.args.get("keyword", "").strip()
     try:
-        folders = analyzer.get_policy_documents(policy_dir)
-        if folders:
-            logger.info(f"找到 {len(folders)} 个政策文档")
-            return jsonify({"documents": [{"name": "根目录", "files": folders}], "count": len(folders)})
-        return jsonify({"documents": [], "count": 0, "message": "暂无政策文档"})
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        policy_dir = os.path.join(project_root, 'policy_document')
+
+        if not os.path.exists(policy_dir):
+            return jsonify({"documents": [], "count": 0, "total": 0})
+
+        # 获取目录下的所有 .md 文件
+        files = sorted([f for f in os.listdir(policy_dir) if f.endswith('.md')])
+
+        # 如果有搜索关键词，进行过滤
+        if keyword:
+            files = [f for f in files if keyword.lower() in f.lower()]
+
+        documents = [{"name": "根目录", "files": files}]
+        return jsonify({
+            "documents": documents,
+            "count": len(files),
+            "total": len(files),
+            "keyword": keyword
+        })
     except Exception as e:
         logger.error(f"获取文档列表失败: {e}")
         return jsonify({"error": str(e)}), 500
@@ -164,15 +189,41 @@ def download_documents():
 
 @app.route("/api/analysis-results")
 def list_analysis_results():
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    analyze_dir = os.path.join(project_root, 'analyze_result')
+    """直接从 analyze_result 目录获取分析结果列表"""
     try:
-        folders = analyzer.get_policy_documents(analyze_dir)
-        if folders:
-            return jsonify({"results": [{"name": "根目录", "files": folders}], "count": len(folders)})
-        return jsonify({"results": [], "count": 0, "message": "暂无分析结果"})
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        analyze_dir = os.path.join(project_root, 'analyze_result')
+
+        if not os.path.exists(analyze_dir):
+            return jsonify({"results": [], "count": 0, "total": 0})
+
+        # 获取目录下的所有 .md 和 .docx 文件
+        files = sorted([f for f in os.listdir(analyze_dir) if f.endswith('.md') or f.endswith('.docx')])
+
+        # 只显示分析结果文件（包含 "_分析结果_"）
+        analysis_files = [f for f in files if '_分析结果_' in f]
+
+        results = [{"name": "根目录", "files": analysis_files}]
+        return jsonify({
+            "results": results,
+            "count": len(analysis_files),
+            "total": len(analysis_files)
+        })
     except Exception as e:
         logger.error(f"获取分析结果列表失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/analysis-results/<analysis_id>")
+def get_analysis_detail(analysis_id):
+    """获取分析结果详情"""
+    try:
+        result = get_analysis_result(analysis_id)
+        if result:
+            return jsonify({"success": True, "result": result})
+        return jsonify({"success": False, "message": "分析结果不存在"}), 404
+    except Exception as e:
+        logger.error(f"获取分析详情失败: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -254,6 +305,27 @@ def analyze_status():
             text = '等待自动分析'
         return jsonify({"success": True, "status": status_text, "text": text})
     return jsonify({"success": True, "status": "pending", "text": "等待自动分析"})
+
+
+@app.route("/api/analyze-progress")
+@limiter.exempt  # 进度查询不限制
+def analyze_progress():
+    """获取分析进度"""
+    try:
+        progress = analyzer.get_progress()
+        return jsonify({
+            "success": True,
+            "running": progress.get('running', False),
+            "total": progress.get('total', 0),
+            "current": progress.get('current', 0),
+            "success_count": progress.get('success', 0),
+            "failed_count": progress.get('failed', 0),
+            "current_file": progress.get('current_file', ''),
+            "progress_percent": progress.get('progress_percent', 0)
+        })
+    except Exception as e:
+        logger.error(f"获取分析进度失败: {e}")
+        return jsonify({"success": False, "error": str(e)})
 
 
 # ============ 用户认证接口 ============
@@ -412,24 +484,55 @@ def add_message(session_id: str):
 @limiter.limit("5 per hour")
 @app.route("/api/trigger-analyze", methods=["POST"])
 def trigger_analyze():
-    """手动触发分析任务"""
+    """手动触发分析任务（并行分析）"""
     try:
-        logger.info("手动触发政策文档分析...")
+        logger.info("手动触发政策文档分析（并行模式）...")
         project_root = os.path.dirname(os.path.abspath(__file__))
         policy_dir = os.path.join(project_root, 'policy_document')
-        success_count, failed_count = analyzer.run_analysis(policy_dir)
+        # 使用并行分析（5个session并发）
+        success_count, failed_count = analyzer.run_parallel_analysis(policy_dir, max_workers=5)
         if success_count > 0 or failed_count > 0:
             return jsonify({
                 "success": True,
-                "message": "分析完成",
+                "message": f"分析完成！成功: {success_count}, 失败: {failed_count}",
                 "successCount": success_count,
                 "failedCount": failed_count
             })
         else:
-            return jsonify({"success": False, "message": "没有找到政策文档"})
+            # 检查是否有文档
+            from analyzer import PolicyAnalyzer
+            temp_analyzer = PolicyAnalyzer(None)
+            doc_files = temp_analyzer.get_policy_documents(policy_dir)
+            if not doc_files:
+                return jsonify({"success": False, "message": "没有找到政策文档"})
+            else:
+                return jsonify({"success": True, "message": "所有政策文档已分析完成，无需新分析"})
     except Exception as e:
         logger.error(f"手动分析失败: {e}")
         return jsonify({"success": False, "message": str(e)})
+
+
+@app.route("/api/sync-data", methods=["POST"])
+def sync_data():
+    """同步数据：重新扫描目录并更新数据库"""
+    try:
+        from backend.database import init_db, migrate_existing_files, get_statistics
+
+        # 重新初始化数据库并迁移数据
+        init_db()
+        migrate_existing_files()
+        stats = get_statistics()
+
+        logger.info(f"数据同步完成: 文档{stats['document_count']}个, 分析结果{stats['analysis_count']}个")
+
+        return jsonify({
+            "success": True,
+            "message": "同步完成",
+            "statistics": stats
+        })
+    except Exception as e:
+        logger.error(f"数据同步失败: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 if __name__ == "__main__":
