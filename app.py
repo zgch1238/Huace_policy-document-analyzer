@@ -148,7 +148,7 @@ def ask():
 
 @app.route("/api/documents")
 def list_documents():
-    """直接从 policy_document 目录获取文档列表"""
+    """直接从 policy_document 目录获取文档列表，支持递归子目录"""
     keyword = request.args.get("keyword", "").strip()
     try:
         project_root = os.path.dirname(os.path.abspath(__file__))
@@ -157,18 +157,65 @@ def list_documents():
         if not os.path.exists(policy_dir):
             return jsonify({"documents": [], "count": 0, "total": 0})
 
-        # 获取目录下的所有 .md 文件
-        files = sorted([f for f in os.listdir(policy_dir) if f.endswith('.md')])
+        documents = []
+        total_count = 0
 
-        # 如果有搜索关键词，进行过滤
-        if keyword:
-            files = [f for f in files if keyword.lower() in f.lower()]
+        def collect_folders(current_dir, parent_name=""):
+            """递归收集所有文件夹及其直接包含的文件"""
+            nonlocal total_count
 
-        documents = [{"name": "根目录", "files": files}]
+            try:
+                items = os.listdir(current_dir)
+                folder_files = []
+                sub_folders = []
+
+                for item in items:
+                    item_path = os.path.join(current_dir, item)
+                    if os.path.isfile(item_path) and item.endswith('.md'):
+                        if keyword:
+                            if keyword.lower() in item.lower():
+                                folder_files.append(item)
+                        else:
+                            folder_files.append(item)
+                    elif os.path.isfile(item_path) and item.endswith('.docx'):
+                        if keyword:
+                            if keyword.lower() in item.lower():
+                                folder_files.append(item)
+                        else:
+                            folder_files.append(item)
+                    elif os.path.isdir(item_path):
+                        sub_folders.append(item)
+
+                # 计算文件夹名称
+                if current_dir == policy_dir:
+                    folder_name = "根目录"
+                elif parent_name:
+                    folder_name = parent_name + "/" + os.path.basename(current_dir)
+                else:
+                    folder_name = os.path.basename(current_dir)
+
+                # 添加当前文件夹
+                documents.append({
+                    "name": folder_name,
+                    "files": sorted(folder_files) if folder_files else []
+                })
+                total_count += len(folder_files)
+
+                # 递归处理所有子文件夹
+                for sub_folder in sub_folders:
+                    sub_dir = os.path.join(current_dir, sub_folder)
+                    collect_folders(sub_dir, folder_name)
+
+            except PermissionError:
+                pass
+
+        # 开始收集
+        collect_folders(policy_dir)
+
         return jsonify({
             "documents": documents,
-            "count": len(files),
-            "total": len(files),
+            "count": len(documents),
+            "total": total_count,
             "keyword": keyword
         })
     except Exception as e:
@@ -185,6 +232,144 @@ def download_documents():
     policy_dir = os.path.join(project_root, 'policy_document')
     result = FileService.download_files(policy_dir, files, "policy_documents")
     return jsonify(result)
+
+
+@app.route("/api/documents/list")
+def list_documents_in_dir():
+    """列出指定目录下的文件和文件夹（资源管理器风格）"""
+    keyword = request.args.get("keyword", "").strip()
+    rel_path = request.args.get("path", "").strip()  # 相对于 policy_document 的路径
+
+    try:
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        policy_dir = os.path.join(project_root, 'policy_document')
+
+        if not os.path.exists(policy_dir):
+            return jsonify({"success": True, "files": [], "folders": [], "currentPath": "", "parentPath": ""})
+
+        # 计算实际目录路径
+        if rel_path:
+            current_dir = os.path.join(policy_dir, rel_path)
+        else:
+            current_dir = policy_dir
+
+        if not os.path.exists(current_dir):
+            return jsonify({"success": True, "files": [], "folders": [], "currentPath": "", "parentPath": ""})
+
+        # 计算父路径
+        if rel_path:
+            parent_path = os.path.dirname(rel_path)
+            if parent_path == ".":
+                parent_path = ""
+        else:
+            parent_path = None  # 已经是根目录
+
+        current_path = rel_path
+
+        # 获取文件和文件夹
+        items = os.listdir(current_dir)
+        folders = []
+        files = []
+
+        for item in items:
+            item_path = os.path.join(current_dir, item)
+            if os.path.isdir(item_path):
+                folders.append(item)
+            elif item.endswith('.md') or item.endswith('.docx'):
+                # 如果有搜索关键词，进行过滤
+                if keyword:
+                    if keyword.lower() in item.lower():
+                        files.append(item)
+                else:
+                    files.append(item)
+
+        folders.sort()
+        files.sort()
+
+        return jsonify({
+            "success": True,
+            "files": files,
+            "folders": folders,
+            "currentPath": current_path,
+            "parentPath": parent_path if parent_path is not None else "",
+            "keyword": keyword
+        })
+    except Exception as e:
+        logger.error(f"获取目录内容失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/analysis/list")
+def list_analysis_dir():
+    """列出分析结果目录的内容（资源管理器风格）"""
+    base_dir = request.args.get("baseDir", "").strip()  # analyze_result 或 policy_document_word
+    rel_path = request.args.get("path", "").strip()     # 相对于 base_dir 的路径
+    keyword = request.args.get("keyword", "").strip()
+    min_score = request.args.get("minScore")
+
+    try:
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        base_path = os.path.join(project_root, base_dir)
+
+        if not os.path.exists(base_path):
+            return jsonify({"success": True, "files": [], "folders": [], "currentPath": "", "parentPath": ""})
+
+        # 计算实际目录路径
+        if rel_path:
+            current_dir = os.path.join(base_path, rel_path)
+        else:
+            current_dir = base_path
+
+        if not os.path.exists(current_dir):
+            return jsonify({"success": True, "files": [], "folders": [], "currentPath": "", "parentPath": ""})
+
+        # 计算父路径
+        if rel_path:
+            parent_path = os.path.dirname(rel_path)
+            if parent_path == ".":
+                parent_path = ""
+        else:
+            parent_path = ""
+
+        current_path = rel_path
+
+        # 获取文件和文件夹
+        items = os.listdir(current_dir)
+        folders = []
+        files = []
+
+        for item in items:
+            item_path = os.path.join(current_dir, item)
+            if os.path.isdir(item_path):
+                folders.append(item)
+            elif item.endswith('.docx'):
+                # 搜索关键词筛选
+                if keyword and keyword.lower() not in item.lower():
+                    continue
+                # 分数筛选
+                if min_score:
+                    score_val = float(min_score)
+                    match = item.match(r'_(\d+\.?\d*)\.docx$')
+                    if match:
+                        file_score = float(match[1])
+                        if file_score < score_val:
+                            continue
+                files.append(item)
+
+        folders.sort()
+        files.sort()
+
+        return jsonify({
+            "success": True,
+            "files": files,
+            "folders": folders,
+            "currentPath": current_path,
+            "parentPath": parent_path,
+            "keyword": keyword
+        })
+    except Exception as e:
+        logger.error(f"获取分析目录内容失败: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/analysis-results")
@@ -214,6 +399,30 @@ def list_analysis_results():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/highlight-docs")
+def list_highlight_docs():
+    """获取 policy_document_word 目录中的高亮文档列表"""
+    try:
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        highlight_dir = os.path.join(project_root, 'policy_document_word')
+
+        if not os.path.exists(highlight_dir):
+            return jsonify({"results": [], "count": 0, "total": 0})
+
+        # 获取目录下的所有 .docx 文件
+        files = sorted([f for f in os.listdir(highlight_dir) if f.endswith('.docx')])
+
+        results = [{"name": "根目录", "files": files}]
+        return jsonify({
+            "results": results,
+            "count": len(files),
+            "total": len(files)
+        })
+    except Exception as e:
+        logger.error(f"获取高亮文档列表失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/analysis-results/<analysis_id>")
 def get_analysis_detail(analysis_id):
     """获取分析结果详情"""
@@ -229,12 +438,24 @@ def get_analysis_detail(analysis_id):
 
 @app.route("/api/download-analysis", methods=["POST"])
 def download_analysis():
-    files = request.json.get("files", [])
+    data = request.json
+    files = data.get("files", [])
+    directory = data.get("directory", "analysis_results")
+
     if not files:
         return jsonify({"success": False, "message": "未指定文件"}), 400
+
     project_root = os.path.dirname(os.path.abspath(__file__))
-    analyze_dir = os.path.join(project_root, 'analyze_result')
-    result = FileService.download_files(analyze_dir, files, "analysis_results")
+
+    # 根据目录参数选择源目录
+    if directory == "policy_document_word":
+        source_dir = os.path.join(project_root, 'policy_document_word')
+        download_name = "highlight_docs"
+    else:
+        source_dir = os.path.join(project_root, 'analyze_result')
+        download_name = "analysis_results"
+
+    result = FileService.download_files(source_dir, files, download_name)
     return jsonify(result)
 
 

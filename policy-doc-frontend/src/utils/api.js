@@ -39,6 +39,29 @@ export const api = {
     return res.json()
   },
 
+  // 资源管理器风格：列出指定目录的内容
+  async listDocumentsInDir(path = '', keyword = '') {
+    let url = `${API_BASE}/api/documents/list?path=${encodeURIComponent(path)}`
+    if (keyword) {
+      url += `&keyword=${encodeURIComponent(keyword)}`
+    }
+    const res = await fetch(url)
+    return res.json()
+  },
+
+  // 资源管理器风格：列出分析结果目录的内容
+  async listAnalysisDir(baseDir, path = '', keyword = '', minScore = null) {
+    let url = `${API_BASE}/api/analysis/list?baseDir=${encodeURIComponent(baseDir)}&path=${encodeURIComponent(path)}`
+    if (keyword) {
+      url += `&keyword=${encodeURIComponent(keyword)}`
+    }
+    if (minScore !== null) {
+      url += `&minScore=${encodeURIComponent(minScore)}`
+    }
+    const res = await fetch(url)
+    return res.json()
+  },
+
   async syncData() {
     const res = await fetch(`${API_BASE}/api/sync-data`, {
       method: 'POST'
@@ -84,11 +107,11 @@ export const api = {
     return res.json()
   },
 
-  async downloadAnalysis(files) {
+  async downloadAnalysis(files, directory = 'analysis_results') {
     const res = await fetch(`${API_BASE}/api/download-analysis`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files })
+      body: JSON.stringify({ files, directory })
     })
     return res.json()
   },
@@ -105,6 +128,12 @@ export const api = {
   // 分析状态
   async getAnalyzeStatus() {
     const res = await fetch(`${API_BASE}/api/analyze-status`)
+    return res.json()
+  },
+
+  // 高亮文档列表
+  async getHighlightDocs() {
+    const res = await fetch(`${API_BASE}/api/highlight-docs`)
     return res.json()
   },
 

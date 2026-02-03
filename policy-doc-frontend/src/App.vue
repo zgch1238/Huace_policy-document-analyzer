@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.vue'
 import ChatView from './views/ChatView.vue'
 import DocumentsView from './views/DocumentsView.vue'
 import AnalysisView from './views/AnalysisView.vue'
+import DocViewer from './components/DocViewer.vue'
 import Login from './components/Login.vue'
 import Register from './components/Register.vue'
 import { api } from './utils/api'
@@ -18,6 +19,11 @@ const currentView = ref('chat')
 // 会话列表
 const sessions = ref([])
 const chatViewRef = ref(null)
+
+// 文档查看器状态
+const showDocViewer = ref(false)
+const docViewerFile = ref('')
+const docViewerSource = ref('result')
 
 // 视图映射
 const viewComponents = {
@@ -101,6 +107,30 @@ const handleNewChat = async () => {
   }
 }
 
+// 处理查看文档结果事件
+const handleViewResult = (resultName) => {
+  // 解析结果名称，格式: "highlight:文件名" 或 "result:文件名"
+  const prefix = resultName.startsWith('highlight:') ? 'highlight' : 'result'
+  const fileName = resultName.replace(/^(highlight|result):/, '')
+
+  docViewerFile.value = fileName
+  docViewerSource.value = prefix
+  showDocViewer.value = true
+}
+
+// 处理查看政策文档事件
+const handleViewDocument = (docName) => {
+  docViewerFile.value = docName
+  docViewerSource.value = 'document'
+  showDocViewer.value = true
+}
+
+// 关闭文档查看器
+const closeDocViewer = () => {
+  showDocViewer.value = false
+  docViewerFile.value = ''
+}
+
 // 检查是否有保存的登录状态
 onMounted(async () => {
   const savedUser = localStorage.getItem('user')
@@ -149,9 +179,19 @@ onMounted(async () => {
       />
       <DocumentsView
         v-else-if="currentView === 'documents'"
+        @view-document="handleViewDocument"
       />
       <AnalysisView
         v-else-if="currentView === 'analysis'"
+        @view-result="handleViewResult"
+      />
+
+      <!-- 文档查看器弹窗 -->
+      <DocViewer
+        v-if="showDocViewer"
+        :fileName="docViewerFile"
+        :source="docViewerSource"
+        @close="closeDocViewer"
       />
     </main>
   </div>

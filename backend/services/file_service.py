@@ -2,6 +2,7 @@
 import os
 import time
 import logging
+import base64
 from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -21,34 +22,77 @@ class FileService:
             prefix: 下载文件名的前缀
 
         Returns:
-            包含 success、fileName、content 的字典
+            包含 success、fileName、content、isBinary 的字典
         """
         all_content = []
+        is_binary = False
+        original_file_name = ""
 
         for file_path in files:
             full_path = os.path.join(file_dir, file_path)
             if os.path.exists(full_path):
-                try:
-                    with open(full_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        all_content.append(f"=== {file_path} ===\n\n{content}")
-                except Exception as e:
-                    logger.error(f"读取文件失败: {file_path}, 错误: {e}")
+                # 检测是否为二进制文件
+                file_ext = os.path.splitext(file_path)[1].lower()
+                binary_extensions = ['.docx', '.xlsx', '.pptx', '.pdf', '.zip', '.jpg', '.png', '.gif']
+
+                if file_ext in binary_extensions:
+                    # 二进制文件使用 base64 编码
+                    try:
+                        with open(full_path, 'rb') as f:
+                            content = f.read()
+                            encoded_content = base64.b64encode(content).decode('utf-8')
+                            all_content.append({
+                                "fileName": file_path,
+                                "content": encoded_content,
+                                "isBinary": True
+                            })
+                            is_binary = True
+                            original_file_name = file_path
+                    except Exception as e:
+                        logger.error(f"读取二进制文件失败: {file_path}, 错误: {e}")
+                else:
+                    # 文本文件使用 UTF-8 读取
+                    try:
+                        with open(full_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            all_content.append({
+                                "fileName": file_path,
+                                "content": content,
+                                "isBinary": False
+                            })
+                            original_file_name = file_path
+                    except Exception as e:
+                        logger.error(f"读取文件失败: {file_path}, 错误: {e}")
 
         if not all_content:
             return {
                 "success": False,
                 "message": "没有找到有效文件",
                 "fileName": "",
-                "content": ""
+                "content": "",
+                "isBinary": False
             }
 
-        combined_content = "\n\n".join(all_content)
-        return {
-            "success": True,
-            "fileName": f"{prefix}_{time.strftime('%Y%m%d_%H%M%S')}.md",
-            "content": combined_content
-        }
+        if is_binary and len(all_content) == 1:
+            # 单个二进制文件直接返回
+            return {
+                "success": True,
+                "fileName": all_content[0]["fileName"],
+                "content": all_content[0]["content"],
+                "isBinary": True
+            }
+        else:
+            # 文本文件合并返回
+            combined_content = "\n\n".join([
+                f"=== {item['fileName']} ===\n\n{item['content']}"
+                for item in all_content
+            ])
+            return {
+                "success": True,
+                "fileName": f"{prefix}_{time.strftime('%Y%m%d_%H%M%S')}.md",
+                "content": combined_content,
+                "isBinary": False
+            }
 
     @staticmethod
     def delete_files(file_dir: str, files: List[str]) -> Dict[str, Any]:
