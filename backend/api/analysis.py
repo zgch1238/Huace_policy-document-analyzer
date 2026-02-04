@@ -1,6 +1,7 @@
 """分析结果API端点"""
 from flask import Blueprint, request, jsonify
 import os
+import re
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,14 +45,10 @@ def list_analysis_dir():
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         base_path = os.path.join(project_root, base_dir)
 
-        logger.info(f"[DEBUG] base_dir={base_dir}, project_root={project_root}, base_path={base_path}")
-        logger.info(f"[DEBUG] exists={os.path.exists(base_path)}")
-
         if not os.path.exists(base_path):
             return jsonify({"success": True, "files": [], "folders": [], "currentPath": "", "parentPath": ""})
 
         current_dir = os.path.join(base_path, rel_path) if rel_path else base_path
-        logger.info(f"[DEBUG] current_dir={current_dir}, exists={os.path.exists(current_dir)}")
 
         if not os.path.exists(current_dir):
             return jsonify({"success": True, "files": [], "folders": [], "currentPath": "", "parentPath": ""})
@@ -60,7 +57,6 @@ def list_analysis_dir():
         current_path = rel_path
 
         items = os.listdir(current_dir)
-        logger.info(f"[DEBUG] items count={len(items)}: {items}")
         folders = []
         files = []
 
@@ -74,6 +70,15 @@ def list_analysis_dir():
                     # 搜索关键词筛选
                     if keyword and keyword.lower() not in item.lower():
                         continue
+                    # 分数筛选 - 从文件名末尾提取分数（如 xxx_58.0.md）
+                    if min_score:
+                        score_val = float(min_score)
+                        # 从右向左匹配最后一个下划线后的数字
+                        match = re.match(r'.*[_-](\d+\.?\d*)\.md$', item)
+                        if match:
+                            file_score = float(match[1])
+                            if file_score < score_val:
+                                continue
                     files.append(item)
             elif base_dir == 'policy_document_word':
                 # 高亮文档目录：只显示 .docx 文件
@@ -81,10 +86,11 @@ def list_analysis_dir():
                     # 搜索关键词筛选
                     if keyword and keyword.lower() not in item.lower():
                         continue
-                    # 分数筛选
+                    # 分数筛选 - 从文件名末尾提取分数（如 xxx_58.0.docx）
                     if min_score:
                         score_val = float(min_score)
-                        match = item.match(r'[-_](\d+\.?\d*)\.docx$')
+                        # 从右向左匹配最后一个下划线后的数字
+                        match = re.match(r'.*[_-](\d+\.?\d*)\.docx$', item)
                         if match:
                             file_score = float(match[1])
                             if file_score < score_val:
@@ -152,7 +158,8 @@ def list_highlight_docs():
 
 @analysis_bp.route("/api/download-analysis", methods=["POST"])
 def download_analysis():
-    """下载分析结果或高亮文档"""
+    """下载分析结果或高亮文档（支持文件和文件夹）"""
+    from flask import send_file
     data = request.json
     files = data.get("files", [])
     directory = data.get("directory", "analysis_results")
@@ -168,6 +175,20 @@ def download_analysis():
         download_name = "analysis_results"
 
     result = get_file_service().download_files(source_dir, files, download_name)
+
+    # 如果是文件夹下载，返回ZIP文件
+    if result.get("isFolder") and result.get("zipPath"):
+        try:
+            return send_file(
+                result["zipPath"],
+                as_attachment=True,
+                download_name=result["fileName"],
+                mimetype='application/zip'
+            )
+        except Exception as e:
+            logger.error(f"发送ZIP文件失败: {e}")
+            return jsonify({"success": False, "message": "下载失败"}), 500
+
     return jsonify(result)
 
 
@@ -188,6 +209,54 @@ def delete_analysis():
     analyze_dir = get_analysis_dir()
     result = get_file_service().delete_files(analyze_dir, files)
     return jsonify(result)
+
+
+@analysis_bp.route("/api/analysis/delete-folder", methods=["POST"])
+def delete_analysis_folder():
+    """删除分析结果文件夹（仅管理员）"""
+    from backend.auth import is_admin
+    from backend.services.file_service import FileService
+    data = request.json
+    folder_path = data.get("folderPath", "")
+    base_dir = data.get("baseDir", "analyze_result")
+    username = data.get("username", "")
+
+    if not is_admin(username):
+        return jsonify({"success": False, "message": "只有管理员才能删除文件夹"}), 403
+
+    if not folder_path:
+        return jsonify({"success": False, "message": "请提供文件夹路径"}), 400
+
+    result = FileService.delete_folder(folder_path)
+    return jsonify(result)
+
+
+@analysis_bp.route("/api/analysis/download-folder", methods=["POST"])
+def download_analysis_folder():
+    """打包下载分析结果文件夹"""
+    from flask import send_file
+    from backend.services.file_service import FileService
+    data = request.json
+    folder_path = data.get("folderPath", "")
+
+    if not folder_path:
+        return jsonify({"success": False, "message": "请提供文件夹路径"}), 400
+
+    result = FileService.download_folder_as_zip(folder_path)
+
+    if not result.get("success"):
+        return jsonify(result), 400
+
+    try:
+        return send_file(
+            result["zipPath"],
+            as_attachment=True,
+            download_name=result["zipName"],
+            mimetype='application/zip'
+        )
+    except Exception as e:
+        logger.error(f"发送ZIP文件失败: {e}")
+        return jsonify({"success": False, "message": "下载失败"}), 500
 
 
 @analysis_bp.route("/api/save-analysis", methods=["POST"])
@@ -278,7 +347,6 @@ def trigger_analyze():
         # 从 backend/api/ 向上两级到项目根目录
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         policy_dir = os.path.join(project_root, 'policy_document')
-        logger.info(f"[DEBUG] project_root={project_root}, policy_dir={policy_dir}")
 
         opencode_client = OpenCodeClient(OPENCODE_SERVER_URL)
         analyzer = PolicyAnalyzer(opencode_client)

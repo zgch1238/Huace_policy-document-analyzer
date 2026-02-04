@@ -31,6 +31,7 @@ from backend.api.documents import documents_bp
 from backend.api.analysis import analysis_bp
 from backend.api.auth import auth_bp
 from backend.api.system import system_bp
+from backend.api.crawl import crawl_bp
 
 OPENCODE_SERVER_URL = os.getenv('OPENCODE_SERVER_URL', 'http://127.0.0.1:4096')
 FLASK_PORT = int(os.getenv('FLASK_PORT', 5000))
@@ -70,6 +71,7 @@ app.register_blueprint(documents_bp)
 app.register_blueprint(analysis_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(system_bp)
+app.register_blueprint(crawl_bp)
 
 SESSION_ID = None
 

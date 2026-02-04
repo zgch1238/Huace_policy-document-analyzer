@@ -125,13 +125,28 @@ def list_documents_in_dir():
 
 @documents_bp.route("/api/download-documents", methods=["POST"])
 def download_documents():
-    """下载政策文档"""
+    """下载政策文档（支持文件和文件夹）"""
+    from flask import send_file
     files = request.json.get("files", [])
     if not files:
         return jsonify({"success": False, "message": "未指定文件"}), 400
 
     policy_dir = get_policy_dir()
     result = get_file_service().download_files(policy_dir, files, "policy_documents")
+
+    # 如果是文件夹下载，返回ZIP文件
+    if result.get("isFolder") and result.get("zipPath"):
+        try:
+            return send_file(
+                result["zipPath"],
+                as_attachment=True,
+                download_name=result["fileName"],
+                mimetype='application/zip'
+            )
+        except Exception as e:
+            logger.error(f"发送ZIP文件失败: {e}")
+            return jsonify({"success": False, "message": "下载失败"}), 500
+
     return jsonify(result)
 
 
@@ -152,3 +167,48 @@ def delete_documents():
     policy_dir = get_policy_dir()
     result = get_file_service().delete_files(policy_dir, files)
     return jsonify(result)
+
+
+@documents_bp.route("/api/delete-folder", methods=["POST"])
+def delete_folder():
+    """删除文件夹（仅管理员）"""
+    from backend.auth import is_admin
+    data = request.json
+    folder_path = data.get("folderPath", "")
+    username = data.get("username", "")
+
+    if not is_admin(username):
+        return jsonify({"success": False, "message": "只有管理员才能删除文件夹"}), 403
+
+    if not folder_path:
+        return jsonify({"success": False, "message": "请提供文件夹路径"}), 400
+
+    result = get_file_service().delete_folder(folder_path)
+    return jsonify(result)
+
+
+@documents_bp.route("/api/download-folder", methods=["POST"])
+def download_folder():
+    """打包下载文件夹"""
+    from flask import send_file
+    data = request.json
+    folder_path = data.get("folderPath", "")
+
+    if not folder_path:
+        return jsonify({"success": False, "message": "请提供文件夹路径"}), 400
+
+    result = get_file_service().download_folder_as_zip(folder_path)
+
+    if not result.get("success"):
+        return jsonify(result), 400
+
+    try:
+        return send_file(
+            result["zipPath"],
+            as_attachment=True,
+            download_name=result["zipName"],
+            mimetype='application/zip'
+        )
+    except Exception as e:
+        logger.error(f"发送ZIP文件失败: {e}")
+        return jsonify({"success": False, "message": "下载失败"}), 500

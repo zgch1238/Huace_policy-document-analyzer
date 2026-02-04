@@ -10,6 +10,7 @@ const emit = defineEmits(['switch-view', 'logout', 'select-session', 'delete-ses
 const menuItems = [
   { id: 'chat', icon: '💬', label: '智能对话' },
   { id: 'documents', icon: '📄', label: '政策文档' },
+  { id: 'crawler', icon: '🔍', label: '政策采集' },
   { id: 'analysis', icon: '📊', label: '分析结果' }
 ]
 </script>

@@ -43,7 +43,6 @@ def scan_analyze_results():
     result_dir = os.path.join(base_dir, 'analyze_result')
 
     if not os.path.exists(result_dir):
-        print(f"目录不存在: {result_dir}")
         return []
 
     conn = get_connection()
@@ -68,7 +67,6 @@ def scan_analyze_results():
                 with open(filepath, 'r', encoding='utf-8') as f:
                     content = f.read()
             except Exception:
-                print(f"读取失败: {filename}")
                 continue
 
             # 提取内容
@@ -153,19 +151,7 @@ def get_statistics():
 
 if __name__ == '__main__':
     init_db()
-    print("\n扫描 analyze_result/ 目录...")
     results = scan_analyze_results()
-
-    if results:
-        print(f"\n处理了 {len(results)} 个文件:")
-        for r in results:
-            print(f"  [{r['action']}] {r['file']}")
-    else:
-        print("没有找到分析结果文件")
-
     stats = get_statistics()
-    print(f"\n统计: 共 {stats['total']} 条, 平均分 {stats['avg_score']}")
-
-
-# 兼容旧名称
+    print(f"扫描完成: 共 {stats['total']} 条, 平均分 {stats['avg_score']}")
 migrate_existing_files = scan_analyze_results

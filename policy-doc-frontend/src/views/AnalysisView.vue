@@ -209,7 +209,8 @@ const getScoreClass = (fileName) => {
 }
 
 const getScore = (fileName) => {
-  const match = fileName.match(/_(\d+\.?\d*)\.(docx|md)$/)
+  // 从文件名末尾提取分数（如 xxx_58.0.md 或 xxx_58.0.docx）
+  const match = fileName.match(/[_-](\d+\.?\d*)\.(md|docx)$/)
   return match ? parseFloat(match[1]) : null
 }
 
@@ -221,7 +222,18 @@ const handleDownload = async () => {
   for (const filePath of fileList) {
     try {
       const result = await api.downloadAnalysis([filePath], baseDir.value)
-      if (result.success) {
+      if (result.success && result.isFolder && result.blob) {
+        // 文件夹下载：返回的是ZIP blob
+        const url = URL.createObjectURL(result.blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filePath.split('/').pop() + '.zip'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      } else if (result.success) {
+        // 普通文件下载
         downloadFile(result.fileName, result.content, result.isBinary)
       }
     } catch (error) {

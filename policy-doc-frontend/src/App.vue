@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.vue'
 import ChatView from './views/ChatView.vue'
 import DocumentsView from './views/DocumentsView.vue'
 import AnalysisView from './views/AnalysisView.vue'
+import CrawlerView from './views/CrawlerView.vue'
 import DocViewer from './components/DocViewer.vue'
 import Login from './components/Login.vue'
 import Register from './components/Register.vue'
@@ -29,7 +30,8 @@ const docViewerSource = ref('result')
 const viewComponents = {
   chat: ChatView,
   documents: DocumentsView,
-  analysis: AnalysisView
+  analysis: AnalysisView,
+  crawler: CrawlerView
 }
 
 // 提供用户状态给子组件
@@ -173,18 +175,26 @@ onMounted(async () => {
     />
 
     <main class="main-content">
+      <!-- ChatView 不使用 keep-alive -->
       <ChatView
         v-if="currentView === 'chat'"
         ref="chatViewRef"
       />
-      <DocumentsView
-        v-else-if="currentView === 'documents'"
-        @view-document="handleViewDocument"
-      />
-      <AnalysisView
-        v-else-if="currentView === 'analysis'"
-        @view-result="handleViewResult"
-      />
+
+      <!-- 其他视图使用 keep-alive 缓存 -->
+      <keep-alive :include="['CrawlerView']">
+        <DocumentsView
+          v-if="currentView === 'documents'"
+          @view-document="handleViewDocument"
+        />
+        <AnalysisView
+          v-else-if="currentView === 'analysis'"
+          @view-result="handleViewResult"
+        />
+        <CrawlerView
+          v-else-if="currentView === 'crawler'"
+        />
+      </keep-alive>
 
       <!-- 文档查看器弹窗 -->
       <DocViewer

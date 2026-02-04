@@ -80,6 +80,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ files })
     })
+
+    // 检查响应类型，如果是ZIP文件（binary）直接返回blob
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/zip')) {
+      const blob = await res.blob()
+      return { success: true, isFolder: true, blob: blob }
+    }
+
     return res.json()
   },
 
@@ -90,6 +98,24 @@ export const api = {
       body: JSON.stringify({ files, username })
     })
     return res.json()
+  },
+
+  async deleteFolder(folderPath, username) {
+    const res = await fetch(`${API_BASE}/api/delete-folder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderPath, username })
+    })
+    return res.json()
+  },
+
+  async downloadFolder(folderPath) {
+    const res = await fetch(`${API_BASE}/api/download-folder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderPath })
+    })
+    return res.blob()
   },
 
   // 分析结果
@@ -104,6 +130,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ files, directory })
     })
+
+    // 检查响应类型，如果是ZIP文件（binary）直接返回blob
+    const contentType = res.headers.get('content-type')
+    if (contentType && contentType.includes('application/zip')) {
+      const blob = await res.blob()
+      return { success: true, isFolder: true, blob: blob }
+    }
+
     return res.json()
   },
 
@@ -114,6 +148,24 @@ export const api = {
       body: JSON.stringify({ files, username })
     })
     return res.json()
+  },
+
+  async deleteAnalysisFolder(folderPath, username) {
+    const res = await fetch(`${API_BASE}/api/analysis/delete-folder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderPath, username })
+    })
+    return res.json()
+  },
+
+  async downloadAnalysisFolder(folderPath) {
+    const res = await fetch(`${API_BASE}/api/analysis/download-folder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderPath })
+    })
+    return res.blob()
   },
 
   // 分析状态
@@ -174,6 +226,41 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, role, content })
+    })
+    return res.json()
+  },
+
+  // 爬虫相关
+  async getRegions() {
+    const res = await fetch(`${API_BASE}/api/crawl/regions`)
+    return res.json()
+  },
+
+  async getDepartments(region) {
+    const res = await fetch(`${API_BASE}/api/crawl/departments/${encodeURIComponent(region)}`)
+    return res.json()
+  },
+
+  async getKeywordCategories() {
+    const res = await fetch(`${API_BASE}/api/crawl/keyword-categories`)
+    return res.json()
+  },
+
+  async getSections(region, department) {
+    const res = await fetch(`${API_BASE}/api/crawl/sections/${encodeURIComponent(region)}/${encodeURIComponent(department)}`)
+    return res.json()
+  },
+
+  async getKeywordsByCategory(category) {
+    const res = await fetch(`${API_BASE}/api/crawl/keywords/${encodeURIComponent(category)}`)
+    return res.json()
+  },
+
+  async crawl(data) {
+    const res = await fetch(`${API_BASE}/api/crawl`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
     })
     return res.json()
   }
