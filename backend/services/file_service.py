@@ -29,40 +29,58 @@ class FileService:
         original_file_name = ""
 
         for file_path in files:
-            full_path = os.path.join(file_dir, file_path)
-            if os.path.exists(full_path):
+            # 优先查找对应的 docx 文件
+            md_path = os.path.join(file_dir, file_path)
+            base_name = os.path.splitext(file_path)[0]
+            docx_path = os.path.join(file_dir, base_name + '.docx')
+
+            # 确定要下载的文件
+            download_path = None
+            file_ext = '.md'
+
+            if os.path.exists(docx_path):
+                download_path = docx_path
+                file_ext = '.docx'
+            elif os.path.exists(md_path):
+                download_path = md_path
+            else:
+                logger.warning(f"文件不存在: {file_path}")
+                continue
+
+            if download_path:
                 # 检测是否为二进制文件
-                file_ext = os.path.splitext(file_path)[1].lower()
                 binary_extensions = ['.docx', '.xlsx', '.pptx', '.pdf', '.zip', '.jpg', '.png', '.gif']
 
                 if file_ext in binary_extensions:
                     # 二进制文件使用 base64 编码
                     try:
-                        with open(full_path, 'rb') as f:
+                        with open(download_path, 'rb') as f:
                             content = f.read()
                             encoded_content = base64.b64encode(content).decode('utf-8')
+                            # 返回 docx 文件名（去掉路径前缀）
+                            return_name = os.path.basename(download_path)
                             all_content.append({
-                                "fileName": file_path,
+                                "fileName": return_name,
                                 "content": encoded_content,
                                 "isBinary": True
                             })
                             is_binary = True
-                            original_file_name = file_path
+                            original_file_name = return_name
                     except Exception as e:
-                        logger.error(f"读取二进制文件失败: {file_path}, 错误: {e}")
+                        logger.error(f"读取二进制文件失败: {download_path}, 错误: {e}")
                 else:
                     # 文本文件使用 UTF-8 读取
                     try:
-                        with open(full_path, 'r', encoding='utf-8') as f:
+                        with open(download_path, 'r', encoding='utf-8') as f:
                             content = f.read()
                             all_content.append({
-                                "fileName": file_path,
+                                "fileName": os.path.basename(download_path),
                                 "content": content,
                                 "isBinary": False
                             })
-                            original_file_name = file_path
+                            original_file_name = os.path.basename(download_path)
                     except Exception as e:
-                        logger.error(f"读取文件失败: {file_path}, 错误: {e}")
+                        logger.error(f"读取文件失败: {download_path}, 错误: {e}")
 
         if not all_content:
             return {

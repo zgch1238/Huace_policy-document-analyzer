@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional, List, Dict
 
 # 用户数据文件路径
-USERS_FILE = Path(__file__).parent.parent / "users.json"
+USERS_FILE = Path(__file__).parent.parent / "data" / "users.json"
 
 
 def load_users() -> List[Dict]:

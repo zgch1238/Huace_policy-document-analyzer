@@ -208,7 +208,7 @@ const getScoreClass = (fileName) => {
 }
 
 const getScore = (fileName) => {
-  const match = fileName.match(/_(\d+\.?\d*)\.docx$/)
+  const match = fileName.match(/_(\d+\.?\d*)\.(docx|md)$/)
   return match ? parseFloat(match[1]) : null
 }
 

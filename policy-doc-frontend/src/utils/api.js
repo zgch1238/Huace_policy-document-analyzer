@@ -98,15 +98,6 @@ export const api = {
     return res.json()
   },
 
-  async searchAnalysis(keyword = '', minScore = null, startDate = null, endDate = null) {
-    let url = `${API_BASE}/api/analysis/search?keyword=${encodeURIComponent(keyword)}`
-    if (minScore !== null) url += `&minScore=${minScore}`
-    if (startDate) url += `&startDate=${startDate}`
-    if (endDate) url += `&endDate=${endDate}`
-    const res = await fetch(url)
-    return res.json()
-  },
-
   async downloadAnalysis(files, directory = 'analysis_results') {
     const res = await fetch(`${API_BASE}/api/download-analysis`, {
       method: 'POST',
