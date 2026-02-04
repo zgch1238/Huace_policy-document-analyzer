@@ -54,7 +54,8 @@ const loadDirectory = async (path = '', keyword = '', score = null) => {
   loading.value = true
   try {
     const data = await api.listAnalysisDir(baseDir.value, path, keyword, score)
-    if (data.success) {
+    // 检查data是否有效
+    if (data && data.success) {
       folders.value = data.folders || []
       files.value = data.files || []
     } else {

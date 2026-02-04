@@ -44,11 +44,11 @@ CORS(app, resources={
     r"/ask": {"origins": "*"}
 })
 
-# API限流配置
+# API限流配置（使用更宽松的限制）
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["2000 per day", "50 per hour"],
+    default_limits=["2000 per day", "500 per hour"],
     storage_uri="memory://"
 )
 
