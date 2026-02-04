@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 华测导航政策文档分析系统
 
 政策文档分析助手，支持 AI 问答、文档管理、资源管理器风格浏览。
@@ -184,3 +185,6 @@ A: 检查 policy_document 目录是否存在政策文档
 ---
 
 **Powered by Claude Code & OpenCode Server**
+=======
+# Huace_policy-document-analyzer
+>>>>>>> 5a6cace1e82b97fc67e9945691ea81d789bf434e
